@@ -1,0 +1,93 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+ 
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+ 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+ 
+static int threshold = 520;
+static bool pulse = false;
+static unsigned long lastBeat = 0;
+static int bpm = 0;
+ 
+int xPos = 0;
+int lastY = 40;              
+#define WAVE_TOP 28          
+#define WAVE_BOTTOM 63       
+ 
+void setup() {
+ 
+  Serial.begin(9600);
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
+ 
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    while(true);
+  }
+ 
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(2);
+  display.setCursor(0, 0);
+  display.println("ECG READY");
+  display.display();
+}
+ 
+void loop() {
+ 
+  if((digitalRead(10) == 1)||(digitalRead(11) == 1)){
+    Serial.println('!');
+  }
+  else{
+ 
+    int sensorValue = analogRead(A0);
+    Serial.println(sensorValue);
+ 
+
+    if(sensorValue > threshold && !pulse){
+ 
+      unsigned long now = millis();
+      unsigned long interval = now - lastBeat;
+ 
+      if(interval > 300 && interval < 1500){
+        bpm = 60000 / interval;
+      }
+ 
+      lastBeat = now;
+      pulse = true;
+    }
+ 
+    if(sensorValue < threshold - 20){
+      pulse = false;
+    }
+ 
+  
+    display.fillRect(0,0,SCREEN_WIDTH,28,SSD1306_BLACK);   
+ 
+    display.setTextSize(1);
+    display.setCursor(0,0);
+    display.print("BPM:");
+ 
+    display.setTextSize(2);
+    display.setCursor(40,6);
+    display.print(bpm);
+ 
+    
+    int y = map(sensorValue,0,1023,WAVE_BOTTOM,WAVE_TOP);
+ 
+    display.drawLine(xPos,lastY,xPos+1,y,SSD1306_WHITE);
+    lastY = y;
+ 
+    xPos++;
+    if(xPos >= SCREEN_WIDTH){
+      xPos = 0;
+      display.fillRect(0,WAVE_TOP,SCREEN_WIDTH,WAVE_BOTTOM-WAVE_TOP+1,SSD1306_BLACK);
+    }
+ 
+    display.display();
+  }
+ 
+  delay(1);
+}
